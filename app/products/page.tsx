@@ -41,6 +41,8 @@ import {
 } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
+import { supabase } from '@/lib/supabase';
+import type { UploadFile, UploadProps } from 'antd';
 
 const { TextArea } = Input;
 const { TabPane } = Tabs;
@@ -146,6 +148,12 @@ export default function ProductsPage() {
   const [detailImages, setDetailImages] = useState<string[]>([]);
   const [newDetailImageUrl, setNewDetailImageUrl] = useState('');
 
+  // 图片上传相关状态
+  const [mainImageUploading, setMainImageUploading] = useState(false);
+  const [detailImageUploading, setDetailImageUploading] = useState(false);
+  const [mainImageFileList, setMainImageFileList] = useState<UploadFile[]>([]);
+  const [detailImageFileList, setDetailImageFileList] = useState<UploadFile[]>([]);
+
    // 加载商品列表
    const loadProducts = async (page = 1, pageSize = 10) => {
      setLoading(true);
@@ -246,6 +254,202 @@ export default function ProductsPage() {
      }
    };
 
+   // 生成唯一文件名
+   const generateUniqueFileName = (originalName: string): string => {
+     const timestamp = Date.now();
+     const randomString = Math.random().toString(36).substring(2, 15);
+     const extension = originalName.split('.').pop();
+     return `product_${timestamp}_${randomString}.${extension}`;
+   };
+
+   // 上传图片到Supabase
+   const uploadImageToSupabase = async (file: File, folder: string = 'products'): Promise<string | null> => {
+     try {
+       const uniqueFileName = generateUniqueFileName(file.name);
+       const filePath = `${folder}/${uniqueFileName}`;
+       
+       const { data, error } = await supabase.storage
+         .from('productImages')
+         .upload(filePath, file, {
+           cacheControl: '3600',
+           upsert: false
+         });
+       
+       if (error) {
+         console.error('Supabase上传错误:', error);
+         message.error(`图片上传失败: ${error.message}`);
+         return null;
+       }
+       
+       // 获取公共URL
+       const { data: urlData } = supabase.storage
+         .from('productImages')
+         .getPublicUrl(filePath);
+       
+       // 打印上传成功后的数据
+       console.log('图片上传成功:', {
+         originalName: file.name,
+         uniqueFileName,
+         filePath,
+         publicUrl: urlData.publicUrl,
+         uploadData: data,
+         fileSize: file.size,
+         fileType: file.type
+       });
+       
+       message.success(`图片上传成功: ${file.name}`);
+       return urlData.publicUrl;
+     } catch (error) {
+       console.error('图片上传异常:', error);
+       message.error('图片上传失败');
+       return null;
+     }
+   };
+
+   // 主图上传配置
+   const mainImageUploadProps: UploadProps = {
+     name: 'mainImage',
+     listType: 'picture-card',
+     fileList: mainImageFileList,
+     beforeUpload: (file) => {
+       const isImage = file.type.startsWith('image/');
+       if (!isImage) {
+         message.error('只能上传图片文件!');
+         return false;
+       }
+       const isLt5M = file.size / 1024 / 1024 < 5;
+       if (!isLt5M) {
+         message.error('图片大小不能超过5MB!');
+         return false;
+       }
+       return false; // 阻止自动上传，手动处理
+     },
+     onChange: async (info) => {
+       // 更新文件列表状态
+       setMainImageFileList(info.fileList);
+       
+       // 获取最新添加的文件
+       const latestFile = info.fileList[info.fileList.length - 1];
+       
+       // 如果有新文件且有原始文件对象，则上传到Supabase
+       if (latestFile && latestFile.originFileObj && !latestFile.url) {
+         setMainImageUploading(true);
+         
+         try {
+           const url = await uploadImageToSupabase(latestFile.originFileObj, 'products/main');
+           
+           if (url) {
+             // 更新表单字段
+             productForm.setFieldsValue({ mainImage: url });
+             
+             // 更新文件列表，添加URL
+             setMainImageFileList([{
+               uid: latestFile.uid,
+               name: latestFile.name,
+               status: 'done',
+               url: url
+             }]);
+           } else {
+             // 上传失败，移除文件
+             setMainImageFileList([]);
+           }
+         } catch (error) {
+           console.error('主图上传失败:', error);
+           message.error('主图上传失败');
+           setMainImageFileList([]);
+         } finally {
+           setMainImageUploading(false);
+         }
+       }
+       
+       // 如果文件列表为空，清空表单字段
+       if (info.fileList.length === 0) {
+         productForm.setFieldsValue({ mainImage: '' });
+       }
+     },
+     onRemove: () => {
+       productForm.setFieldsValue({ mainImage: '' });
+       setMainImageFileList([]);
+     },
+     maxCount: 1
+   };
+
+   // 详情图片上传配置
+   const detailImageUploadProps: UploadProps = {
+     name: 'detailImages',
+     listType: 'picture-card',
+     fileList: detailImageFileList,
+     beforeUpload: (file) => {
+       const isImage = file.type.startsWith('image/');
+       if (!isImage) {
+         message.error('只能上传图片文件!');
+         return false;
+       }
+       const isLt5M = file.size / 1024 / 1024 < 5;
+       if (!isLt5M) {
+         message.error('图片大小不能超过5MB!');
+         return false;
+       }
+       return false; // 阻止自动上传，手动处理
+     },
+     onChange: async (info) => {
+       // 更新文件列表状态
+       setDetailImageFileList(info.fileList);
+       
+       // 获取最新添加的文件
+       const latestFile = info.fileList[info.fileList.length - 1];
+       
+       // 如果有新文件且有原始文件对象，则上传到Supabase
+       if (latestFile && latestFile.originFileObj && !latestFile.url) {
+         setDetailImageUploading(true);
+         
+         try {
+           const url = await uploadImageToSupabase(latestFile.originFileObj, 'products/detail');
+           
+           if (url) {
+             // 更新详情图片数组
+             const newDetailImages = [...detailImages, url];
+             setDetailImages(newDetailImages);
+             
+             // 更新文件列表，添加URL
+             const updatedFileList = info.fileList.map(file => {
+               if (file.uid === latestFile.uid) {
+                 return {
+                   ...file,
+                   status: 'done' as const,
+                   url: url
+                 };
+               }
+               return file;
+             });
+             setDetailImageFileList(updatedFileList);
+           } else {
+             // 上传失败，移除最新添加的文件
+             const filteredFileList = info.fileList.filter(file => file.uid !== latestFile.uid);
+             setDetailImageFileList(filteredFileList);
+           }
+         } catch (error) {
+           console.error('详情图片上传失败:', error);
+           message.error('详情图片上传失败');
+           // 上传失败，移除最新添加的文件
+           const filteredFileList = info.fileList.filter(file => file.uid !== latestFile.uid);
+           setDetailImageFileList(filteredFileList);
+         } finally {
+           setDetailImageUploading(false);
+         }
+       }
+     },
+     onRemove: (file) => {
+       if (file.url) {
+         const newDetailImages = detailImages.filter(img => img !== file.url);
+         setDetailImages(newDetailImages);
+       }
+       const newFileList = detailImageFileList.filter(item => item.uid !== file.uid);
+       setDetailImageFileList(newFileList);
+     },
+     multiple: true
+   };
+
    // 打开商品编辑弹窗
    const handleEditProduct = (product?: Product) => {
      setCurrentProduct(product || null);
@@ -253,10 +457,37 @@ export default function ProductsPage() {
        productForm.setFieldsValue(product);
        setDetailImages(product.detailImages || []);
        setCurrentSpecConfig(product.specConfig || { specs: [] });
+       
+       // 初始化主图文件列表
+       if (product.mainImage) {
+         setMainImageFileList([{
+           uid: '-1',
+           name: 'main-image',
+           status: 'done',
+           url: product.mainImage
+         }]);
+       } else {
+         setMainImageFileList([]);
+       }
+       
+       // 初始化详情图片文件列表
+       if (product.detailImages && product.detailImages.length > 0) {
+         const fileList = product.detailImages.map((url, index) => ({
+           uid: `detail-${index}`,
+           name: `detail-image-${index + 1}`,
+           status: 'done' as const,
+           url: url
+         }));
+         setDetailImageFileList(fileList);
+       } else {
+         setDetailImageFileList([]);
+       }
      } else {
        productForm.resetFields();
        setDetailImages([]);
        setCurrentSpecConfig({ specs: [] });
+       setMainImageFileList([]);
+       setDetailImageFileList([]);
      }
      setEditModalVisible(true);
    };
@@ -1017,6 +1248,8 @@ export default function ProductsPage() {
              productForm.resetFields();
              setDetailImages([]);
              setCurrentSpecConfig({ specs: [] });
+             setMainImageFileList([]);
+             setDetailImageFileList([]);
            }}
            footer={null}
            width={800}
@@ -1050,16 +1283,55 @@ export default function ProductsPage() {
              
              <Form.Item
                name="mainImage"
-               label="主图URL"
+               label="主图"
              >
-               <Input placeholder="请输入主图URL" />
+               <div>
+                 <Upload {...mainImageUploadProps}>
+                   {mainImageFileList.length >= 1 ? null : (
+                     <div>
+                       <PlusOutlined />
+                       <div style={{ marginTop: 8 }}>上传主图</div>
+                     </div>
+                   )}
+                 </Upload>
+                 <div style={{ marginTop: 8, fontSize: '12px', color: '#666' }}>
+                   支持jpg、png格式，文件大小不超过5MB
+                 </div>
+                 <Input 
+                   placeholder="或直接输入图片URL" 
+                   style={{ marginTop: 8 }}
+                   onChange={(e) => {
+                     if (e.target.value) {
+                       setMainImageFileList([{
+                         uid: '-url',
+                         name: 'url-image',
+                         status: 'done',
+                         url: e.target.value
+                       }]);
+                     } else {
+                       setMainImageFileList([]);
+                     }
+                   }}
+                 />
+               </div>
              </Form.Item>
              
              {/* 详情图片管理 */}
              <Form.Item label="详情图片">
                <div>
-                 <Tabs defaultActiveKey="single" size="small" style={{ marginBottom: 16 }}>
-                   <TabPane tab="单个添加" key="single">
+                 <Tabs defaultActiveKey="upload" size="small" style={{ marginBottom: 16 }}>
+                   <TabPane tab="图片上传" key="upload">
+                     <Upload {...detailImageUploadProps}>
+                       <div>
+                         <PlusOutlined />
+                         <div style={{ marginTop: 8 }}>上传详情图片</div>
+                       </div>
+                     </Upload>
+                     <div style={{ marginTop: 8, fontSize: '12px', color: '#666' }}>
+                       支持jpg、png格式，文件大小不超过5MB，可批量上传
+                     </div>
+                   </TabPane>
+                   <TabPane tab="URL添加" key="url">
                      <Space style={{ marginBottom: 8 }}>
                        <Input
                          placeholder="请输入图片URL"
@@ -1234,6 +1506,8 @@ export default function ProductsPage() {
                    productForm.resetFields();
                    setDetailImages([]);
                    setCurrentSpecConfig({ specs: [] });
+                   setMainImageFileList([]);
+                   setDetailImageFileList([]);
                  }}>
                    取消
                  </Button>
