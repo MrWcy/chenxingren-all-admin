@@ -1,15 +1,19 @@
+'use client'
+
 import AdminLayout from './components/AdminLayout';
 import { Card, Row, Col, Statistic } from 'antd';
 import { UserOutlined, ShoppingOutlined, ShoppingCartOutlined, DollarOutlined } from '@ant-design/icons';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function Home() {
   return (
-    <AdminLayout>
-      <div>
-        <h1 style={{ fontSize: '24px', marginBottom: '24px' }}>概览页面</h1>
-        <p style={{ fontSize: '16px', color: '#666', marginBottom: '32px' }}>
-          这是概览页面，显示系统的整体数据统计
-        </p>
+    <AuthGuard>
+      <AdminLayout>
+        <div>
+          <h1 style={{ fontSize: '24px', marginBottom: '24px' }}>概览页面</h1>
+          <p style={{ fontSize: '16px', color: '#666', marginBottom: '32px' }}>
+            这是概览页面，显示系统的整体数据统计
+          </p>
         
         <Row gutter={16}>
           <Col span={6}>
@@ -54,7 +58,8 @@ export default function Home() {
             </Card>
           </Col>
         </Row>
-      </div>
-    </AdminLayout>
+        </div>
+      </AdminLayout>
+    </AuthGuard>
   );
 }

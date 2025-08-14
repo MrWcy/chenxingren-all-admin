@@ -1,6 +1,7 @@
 'use client';
 
 import AdminLayout from '../components/AdminLayout';
+import AuthGuard from '@/components/AuthGuard';
 import { 
   Card, 
   Table, 
@@ -199,8 +200,12 @@ export default function ProductsPage() {
    const handleSaveProduct = async (values: any) => {
      try {
        // 验证规格配置
-       if (currentSpecConfig.specs.length > 0 && !validateSpecConfig()) {
-         return;
+       if (currentSpecConfig.specs.length > 0) {
+         const validation = validateSpecConfig();
+         if (!validation.isValid) {
+           message.error(validation.message);
+           return;
+         }
        }
        
        const isEdit = !!currentProduct;
@@ -383,19 +388,28 @@ export default function ProductsPage() {
    const validateSpecConfig = () => {
      for (const spec of currentSpecConfig.specs) {
        if (!spec.key.trim()) {
-         message.error('请填写所有规格的标识');
-         return false;
+         return {
+           isValid: false,
+           message: '请填写所有规格的标识'
+         };
        }
        if (!spec.name.trim()) {
-         message.error('请填写所有规格的名称');
-         return false;
+         return {
+           isValid: false,
+           message: '请填写所有规格的名称'
+         };
        }
        if (spec.values.length === 0) {
-         message.error(`规格"${spec.name}"至少需要一个规格值`);
-         return false;
+         return {
+           isValid: false,
+           message: `规格"${spec.name}"至少需要一个规格值`
+         };
        }
      }
-     return true;
+     return {
+       isValid: true,
+       message: '规格配置验证通过'
+     };
    };
 
    // 打开规格配置弹窗
@@ -651,7 +665,7 @@ export default function ProductsPage() {
             {specConfig && specConfig.specs && specConfig.specs.length > 0 ? (
               <div>
                 {specConfig.specs.map((spec, index) => (
-                  <Tag key={index} size="small" style={{ marginBottom: 2 }}>
+                  <Tag key={index} style={{ marginBottom: 2 }}>
                     {spec.name}({spec.values.length})
                   </Tag>
                 ))}
@@ -715,7 +729,7 @@ export default function ProductsPage() {
         title: '操作',
         key: 'action',
         width: 200,
-        render: (_, record: Product) => (
+        render: (_: any, record: Product) => (
           <Space size="small">
             <Tooltip title="编辑商品">
               <Button
@@ -821,7 +835,7 @@ export default function ProductsPage() {
         title: '操作',
         key: 'action',
         width: 120,
-        render: (_, record: ProductSku) => (
+        render: (_: any, record: ProductSku) => (
           <Space size="small">
             <Button
               type="primary"
@@ -855,7 +869,7 @@ export default function ProductsPage() {
         title: '用户',
         key: 'user',
         width: 120,
-        render: (_, record: ProductReview) => (
+        render: (_: any, record: ProductReview) => (
           <Space>
             <Avatar src={record.userAvatarUrl} size="small">
               {record.userNickname?.charAt(0)}
@@ -910,7 +924,7 @@ export default function ProductsPage() {
         title: '操作',
         key: 'action',
         width: 200,
-        render: (_, record: ProductReview) => (
+        render: (_: any, record: ProductReview) => (
           <Space size="small">
             <Button
               type="primary"
@@ -939,7 +953,8 @@ export default function ProductsPage() {
     ];
 
    return (
-     <AdminLayout>
+     <AuthGuard>
+       <AdminLayout>
        <div style={{ padding: '24px' }}>
          <Card>
            <div style={{ marginBottom: 16 }}>
@@ -1679,6 +1694,7 @@ export default function ProductsPage() {
            </div>
          </Modal>
        </div>
-     </AdminLayout>
+       </AdminLayout>
+     </AuthGuard>
    );
  }

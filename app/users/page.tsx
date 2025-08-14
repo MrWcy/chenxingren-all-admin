@@ -5,6 +5,7 @@ import { Card, Table, Button, Space, Tag, Modal, Form, Input, Select, DatePicker
 import { EditOutlined, HomeOutlined, UserOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
+import AuthGuard from '@/components/AuthGuard';
 
 interface User {
   id: number;
@@ -173,7 +174,8 @@ export default function UsersPage() {
   };
 
   return (
-    <AdminLayout>
+    <AuthGuard>
+      <AdminLayout>
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', margin: 0 }}>用户管理</h1>
@@ -475,6 +477,7 @@ export default function UsersPage() {
           </Form>
         </Modal>
       </div>
-    </AdminLayout>
+      </AdminLayout>
+    </AuthGuard>
   );
 }

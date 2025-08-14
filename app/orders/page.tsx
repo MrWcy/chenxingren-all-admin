@@ -3,6 +3,7 @@
 import AdminLayout from '../components/AdminLayout';
 import { Card, Table, Button, Space, Tag, Descriptions } from 'antd';
 import { EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
+import AuthGuard from '@/components/AuthGuard';
 
 // 模拟订单数据
 const orderData = [
