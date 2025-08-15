@@ -24,7 +24,7 @@ export async function signUp(email: string, password: string): Promise<AuthRespo
 
     return {
       success: true,
-      user: data.user
+      user: data.user || undefined
     }
   } catch (error) {
     return {
